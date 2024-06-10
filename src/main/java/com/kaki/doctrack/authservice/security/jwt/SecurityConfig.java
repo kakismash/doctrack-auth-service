@@ -25,7 +25,7 @@ import java.security.interfaces.RSAPublicKey;
 @Configuration
 @EnableWebFluxSecurity
 @RequiredArgsConstructor
-public class HttpSecurity {
+public class SecurityConfig {
 
     private final JwtUtil jwtUtil;
 

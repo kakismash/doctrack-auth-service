@@ -3,17 +3,16 @@ package com.kaki.doctrack.authservice.security.jwt;
 import io.jsonwebtoken.Claims;
 import io.jsonwebtoken.Jwts;
 import io.jsonwebtoken.SignatureAlgorithm;
-import io.jsonwebtoken.io.Decoders;
 import io.jsonwebtoken.security.Keys;
-import lombok.RequiredArgsConstructor;
+import lombok.Getter;
 import org.springframework.stereotype.Component;
 
 import java.security.KeyPair;
 import java.util.Date;
 import java.util.function.Function;
 
+@Getter
 @Component
-@RequiredArgsConstructor
 public class JwtUtil {
 
     private final KeyPair keyPair;
@@ -69,7 +68,4 @@ public class JwtUtil {
         return Keys.keyPairFor(SignatureAlgorithm.RS256);
     }
 
-    public KeyPair getKeyPair() {
-        return keyPair;
-    }
 }
