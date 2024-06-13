@@ -1,24 +1,24 @@
 package com.kaki.doctrack.authservice.entity;
 
 import jakarta.persistence.*;
-import lombok.AllArgsConstructor;
-import lombok.Data;
-import lombok.NoArgsConstructor;
+import lombok.*;
 import org.springframework.data.annotation.Id;
 import org.springframework.security.core.GrantedAuthority;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.core.userdetails.UserDetails;
 
 import java.util.Collection;
-import java.util.List;
 import java.util.Set;
 import java.util.stream.Collectors;
 
-@Table(name = "users")  // Changed table name to plural to avoid conflicts with SQL keywords
+@Table(name = "users", uniqueConstraints = @UniqueConstraint(columnNames = {"id", "role_id"}))
 @Entity
 @AllArgsConstructor
 @NoArgsConstructor
-@Data
+@Getter
+@Setter
+@ToString
+@RequiredArgsConstructor
 public class User implements UserDetails {
 
     @Id
@@ -34,6 +34,9 @@ public class User implements UserDetails {
 
     @Column(unique = true, nullable = false, length = 100)
     private String email;
+
+    @Column(nullable = false, length = 100)
+    private String username;
 
     @Column(unique = true, nullable = false, length = 20)
     private String phone;
@@ -53,19 +56,15 @@ public class User implements UserDetails {
     @Column(nullable = false)
     private boolean enabled = true;
 
-    @ManyToMany(fetch = FetchType.EAGER)
-    @JoinTable(
-            name = "user_roles",
-            joinColumns = @JoinColumn(name = "user_id"),
-            inverseJoinColumns = @JoinColumn(name = "role_id")
-    )
-    private Set<Role> roles;
+    @ToString.Exclude
+    @ManyToOne(cascade = {CascadeType.REFRESH, CascadeType.DETACH}, optional = false)
+    @JoinColumn(name = "role_id", nullable = false)
+    private Role role;
 
     @Override
     public Collection<? extends GrantedAuthority> getAuthorities() {
-        return roles.stream()
-                .flatMap(role -> role.getAuthorities().stream())
-                .map(SimpleGrantedAuthority::new)
+        return Set.of(role).stream()
+                .map(role -> new SimpleGrantedAuthority(role.getName()))
                 .collect(Collectors.toSet());
     }
 
@@ -76,7 +75,7 @@ public class User implements UserDetails {
 
     @Override
     public String getUsername() {
-        return email;
+        return username;
     }
 
     @Override

@@ -36,10 +36,10 @@ public class JwtUtil {
 
     private Claims extractAllClaims(String token) {
         return Jwts.parser()
-                .setSigningKey(keyPair.getPublic())
+                .verifyWith(keyPair.getPublic())
                 .build()
-                .parseClaimsJws(token)
-                .getBody();
+                .parseSignedClaims(token)
+                .getPayload();
     }
 
     private Boolean isTokenExpired(String token) {
@@ -55,8 +55,23 @@ public class JwtUtil {
                 .subject(subject)
                 .issuedAt(new Date(System.currentTimeMillis()))
                 .expiration(new Date(System.currentTimeMillis() + 1000 * 60 * 60 * 10))
-                .signWith(keyPair.getPrivate(), SignatureAlgorithm.RS256)
+                .signWith(keyPair.getPrivate(), Jwts.SIG.RS256)
                 .compact();
+    }
+
+    public String refreshToken(String token) {
+        final Claims claims = extractAllClaims(token);
+        return Jwts.builder()
+                .claims(claims)
+                .issuedAt(new Date(System.currentTimeMillis()))
+                .expiration(new Date(System.currentTimeMillis() + 1000 * 60 * 60 * 10))
+                .signWith(keyPair.getPrivate(), Jwts.SIG.RS256)
+                .compact();
+    }
+
+    private boolean validateExpiredToken(String token, String username) {
+        final String extractedUsername = extractUsername(token);
+        return extractedUsername.equals(username);
     }
 
     public Boolean validateToken(String token, String username) {
