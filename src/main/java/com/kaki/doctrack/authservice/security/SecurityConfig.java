@@ -1,12 +1,14 @@
-package com.kaki.doctrack.authservice.security.jwt;
+package com.kaki.doctrack.authservice.security;
 
 
+import com.kaki.doctrack.authservice.security.filter.LoggingWebFilter;
+import com.kaki.doctrack.authservice.security.jwt.JwtUtil;
 import lombok.RequiredArgsConstructor;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.security.access.hierarchicalroles.RoleHierarchyImpl;
-import org.springframework.security.config.Customizer;
 import org.springframework.security.config.annotation.web.reactive.EnableWebFluxSecurity;
+import org.springframework.security.config.web.server.SecurityWebFiltersOrder;
 import org.springframework.security.config.web.server.ServerHttpSecurity;
 import org.springframework.security.core.userdetails.MapReactiveUserDetailsService;
 import org.springframework.security.core.userdetails.User;
@@ -29,6 +31,8 @@ public class SecurityConfig {
 
     private final JwtUtil jwtUtil;
 
+    private final LoggingWebFilter loggingWebFilter;
+
     @Bean
     public SecurityWebFilterChain springSecurityFilterChain(ServerHttpSecurity http) {
         http
@@ -45,9 +49,9 @@ public class SecurityConfig {
                                 .jwtAuthenticationConverter(jwtAuthenticationConverter())
                         )
                 )
-                .httpBasic(Customizer.withDefaults())
-                .formLogin(Customizer.withDefaults());
-
+                .httpBasic(ServerHttpSecurity.HttpBasicSpec::disable)
+                .formLogin(ServerHttpSecurity.FormLoginSpec::disable)
+                .addFilterAt(loggingWebFilter, SecurityWebFiltersOrder.FIRST);
         return http.build();
     }
 
