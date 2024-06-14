@@ -7,6 +7,5 @@ import reactor.core.publisher.Mono;
 
 @Repository
 public interface RoleRepository extends ReactiveCrudRepository<Role, Long> {
-
     Mono<Role> findByName(String roleName);
 }
