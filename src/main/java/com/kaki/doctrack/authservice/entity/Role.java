@@ -2,11 +2,13 @@ package com.kaki.doctrack.authservice.entity;
 
 import jakarta.persistence.*;
 import lombok.*;
-import java.util.LinkedHashSet;
-import java.util.Set;
 
 @Entity
-@Table(name = "roles")
+@org.springframework.data.relational.core.mapping.Table("roles")
+@Table(name="roles", uniqueConstraints = {
+        @UniqueConstraint(columnNames = "name")
+})
+
 @Getter
 @Setter
 @ToString
@@ -20,9 +22,5 @@ public class Role {
 
     @Column(nullable = false, unique = true)
     private String name;
-
-    @OneToMany(mappedBy = "role", cascade = {CascadeType.REFRESH, CascadeType.DETACH})
-    @ToString.Exclude
-    private Set<User> users = new LinkedHashSet<>();
 
 }

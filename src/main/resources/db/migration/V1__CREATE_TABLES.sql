@@ -1,4 +1,12 @@
--- V1__Create_user_and_roles_tables.sql
+CREATE TABLE roles
+(
+    id   BIGINT AUTO_INCREMENT NOT NULL,
+    name VARCHAR(255)          NOT NULL,
+    CONSTRAINT pk_roles PRIMARY KEY (id)
+);
+
+ALTER TABLE roles
+    ADD CONSTRAINT uc_roles_name UNIQUE (name);
 
 CREATE TABLE users
 (
@@ -13,7 +21,7 @@ CREATE TABLE users
     account_non_locked      BIT(1)                NOT NULL,
     credentials_non_expired BIT(1)                NOT NULL,
     enabled                 BIT(1)                NOT NULL,
-    role_id                 BIGINT                NOT NULL,
+    role_id                 BIGINT                NULL,
     CONSTRAINT pk_users PRIMARY KEY (id)
 );
 
@@ -28,13 +36,3 @@ ALTER TABLE users
 
 ALTER TABLE users
     ADD CONSTRAINT FK_USERS_ON_ROLE FOREIGN KEY (role_id) REFERENCES roles (id);
-
-CREATE TABLE roles
-(
-    id   BIGINT AUTO_INCREMENT NOT NULL,
-    name VARCHAR(255)          NOT NULL,
-    CONSTRAINT pk_roles PRIMARY KEY (id)
-);
-
-ALTER TABLE roles
-    ADD CONSTRAINT uc_roles_name UNIQUE (name);

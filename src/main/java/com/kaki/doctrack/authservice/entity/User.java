@@ -12,6 +12,7 @@ import java.util.Set;
 import java.util.stream.Collectors;
 
 @Table(name = "users", uniqueConstraints = @UniqueConstraint(columnNames = {"id", "role_id"}))
+@org.springframework.data.relational.core.mapping.Table("users")
 @Entity
 @AllArgsConstructor
 @NoArgsConstructor
@@ -56,8 +57,9 @@ public class User implements UserDetails {
     private boolean enabled = true;
 
     @ToString.Exclude
-    @ManyToOne(cascade = {CascadeType.REFRESH, CascadeType.DETACH}, optional = false)
-    @JoinColumn(name = "role_id", nullable = false)
+    @ManyToOne(cascade = {CascadeType.REFRESH, CascadeType.DETACH})
+    @JoinColumn(name = "role_id")
+    @org.springframework.data.relational.core.mapping.Column("role_id")
     private Role role;
 
     @Override

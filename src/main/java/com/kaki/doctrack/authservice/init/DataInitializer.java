@@ -5,52 +5,53 @@ import com.kaki.doctrack.authservice.entity.Role;
 import com.kaki.doctrack.authservice.entity.User;
 import com.kaki.doctrack.authservice.repository.RoleRepository;
 import com.kaki.doctrack.authservice.repository.UserRepository;
-import jakarta.annotation.PostConstruct;
 import lombok.RequiredArgsConstructor;
+import org.springframework.boot.ApplicationRunner;
+import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
-import org.springframework.security.crypto.password.PasswordEncoder;
-import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 
 @Configuration
 @RequiredArgsConstructor
 public class DataInitializer {
 
+    private final UserRepository userRepository;
     private final RoleRepository roleRepository;
 
-    private final UserRepository userRepository;
-
-    private final PasswordEncoder passwordEncoder;
-
-    @PostConstruct
-    public void init() {
-        initRoles()
-                .then(initSuperAdminUser())
-                .subscribe();
+    @Bean
+    public ApplicationRunner initializer() {
+        return args -> initRoles()
+            .then(initSuperAdminUser()).subscribe();
     }
 
     private Mono<Void> initRoles() {
-        return Flux.fromArray(ERole.values())
-                .flatMap(role -> roleRepository.findByName(role.name())
-                        .switchIfEmpty(Mono.defer(() -> {
-                            Role roleEntity = new Role();
-                            roleEntity.setName(role.name());
-                            return roleRepository.save(roleEntity);
-                        }))
-                )
+        return createRoleIfNotExists(ERole.SUPERADMIN)
+                .then(createRoleIfNotExists(ERole.ADMIN))
+                .then(createRoleIfNotExists(ERole.USER_READ_ONLY))
+                .then(createRoleIfNotExists(ERole.USER_READ_WRITE))
+                .then();
+    }
+
+    private Mono<Void> createRoleIfNotExists(ERole role) {
+        return roleRepository.findByName(role.name())
+                .switchIfEmpty(roleRepository.save(new Role(null, role.name())))
                 .then();
     }
 
     private Mono<Void> initSuperAdminUser() {
-        return userRepository.findByUsername("kaki1991")
-                .switchIfEmpty(Mono.defer(() -> roleRepository.findByName(ERole.SUPERADMIN.name())
-                        .flatMap(superAdminRole -> {
+        return roleRepository.findByName(ERole.SUPERADMIN.name())
+                .flatMap(role -> userRepository.findByUsername("kaki1991")
+                        .switchIfEmpty(Mono.defer(() -> {
                             User user = new User();
                             user.setUsername("kaki1991");
-                            user.setPassword(passwordEncoder.encode("kaki1991"));
-                            user.setRole(superAdminRole);
+                            user.setRole(role);
+                            user.setEmail("alfian1991@gmail.com");
+                            user.setFirstname("Joaquin");
+                            user.setLastname("Navarro");
+                            user.setPhone("0123456789");
+
                             return userRepository.save(user);
-                        })))
-                .then();
+                        }))
+                ).then();
     }
 }

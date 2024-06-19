@@ -1,28 +1,24 @@
 package com.kaki.doctrack.authservice.security;
 
-
-import com.kaki.doctrack.authservice.security.filter.LoggingWebFilter;
+import com.kaki.doctrack.authservice.security.filter.ReactiveAuthTokenFilter;
 import com.kaki.doctrack.authservice.security.jwt.JwtUtil;
+import com.kaki.doctrack.authservice.service.UserService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
-import org.springframework.security.access.hierarchicalroles.RoleHierarchyImpl;
+import org.springframework.http.HttpStatus;
+import org.springframework.security.authentication.ReactiveAuthenticationManager;
+import org.springframework.security.authentication.UserDetailsRepositoryReactiveAuthenticationManager;
 import org.springframework.security.config.annotation.web.reactive.EnableWebFluxSecurity;
 import org.springframework.security.config.web.server.SecurityWebFiltersOrder;
 import org.springframework.security.config.web.server.ServerHttpSecurity;
-import org.springframework.security.core.userdetails.MapReactiveUserDetailsService;
-import org.springframework.security.core.userdetails.User;
-import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.security.crypto.password.PasswordEncoder;
-import org.springframework.security.oauth2.jwt.NimbusReactiveJwtDecoder;
-import org.springframework.security.oauth2.jwt.ReactiveJwtDecoder;
 import org.springframework.security.oauth2.server.resource.authentication.JwtAuthenticationConverter;
 import org.springframework.security.oauth2.server.resource.authentication.JwtGrantedAuthoritiesConverter;
 import org.springframework.security.oauth2.server.resource.authentication.ReactiveJwtAuthenticationConverterAdapter;
 import org.springframework.security.web.server.SecurityWebFilterChain;
-
-import java.security.interfaces.RSAPublicKey;
+import reactor.core.publisher.Mono;
 
 @Configuration
 @EnableWebFluxSecurity
@@ -31,7 +27,7 @@ public class SecurityConfig {
 
     private final JwtUtil jwtUtil;
 
-    private final LoggingWebFilter loggingWebFilter;
+    private final UserService userService;
 
     @Bean
     public SecurityWebFilterChain springSecurityFilterChain(ServerHttpSecurity http) {
@@ -44,14 +40,14 @@ public class SecurityConfig {
                         .pathMatchers("/api/v1/documents/admins/**").hasRole("ADMIN")
                         .anyExchange().authenticated()
                 )
-                .oauth2ResourceServer(oauth2 -> oauth2
-                        .jwt(jwt -> jwt
-                                .jwtAuthenticationConverter(jwtAuthenticationConverter())
-                        )
-                )
+                .exceptionHandling(exceptionHandlingSpec -> exceptionHandlingSpec
+                        .authenticationEntryPoint((exchange, e) -> Mono.fromRunnable(() -> exchange.getResponse().setStatusCode(HttpStatus.UNAUTHORIZED))))
+                .authenticationManager(authenticationManager())
+                .addFilterAt(authenticationJwtTokenFilter(), SecurityWebFiltersOrder.AUTHENTICATION)
+                //                .addFilterAt(loggingWebFilter, SecurityWebFiltersOrder.FIRST)
                 .httpBasic(ServerHttpSecurity.HttpBasicSpec::disable)
-                .formLogin(ServerHttpSecurity.FormLoginSpec::disable)
-                .addFilterAt(loggingWebFilter, SecurityWebFiltersOrder.FIRST);
+                .formLogin(ServerHttpSecurity.FormLoginSpec::disable);
+
         return http.build();
     }
 
@@ -61,33 +57,13 @@ public class SecurityConfig {
     }
 
     @Bean
-    public MapReactiveUserDetailsService userDetailsService() {
-        UserDetails user = User.builder()
-                .username("user")
-                .password(passwordEncoder().encode("user"))
-                .roles("USER")
-                .build();
-
-        UserDetails admin = User.builder()
-                .username("admin")
-                .password(passwordEncoder().encode("admin"))
-                .roles("ADMIN")
-                .build();
-
-        return new MapReactiveUserDetailsService(user, admin);
+    public ReactiveAuthenticationManager authenticationManager() {
+        return new UserDetailsRepositoryReactiveAuthenticationManager(userService);
     }
 
     @Bean
-    public RoleHierarchyImpl roleHierarchy() {
-        RoleHierarchyImpl roleHierarchy = new RoleHierarchyImpl();
-        roleHierarchy.setHierarchy("ROLE_ADMIN > ROLE_USER");
-        return roleHierarchy;
-    }
-
-    @Bean
-    public ReactiveJwtDecoder jwtDecoder() {
-        RSAPublicKey publicKey = (RSAPublicKey) jwtUtil.getKeyPair().getPublic();
-        return NimbusReactiveJwtDecoder.withPublicKey(publicKey).build();
+    public ReactiveAuthTokenFilter authenticationJwtTokenFilter() {
+        return new ReactiveAuthTokenFilter(jwtUtil, userService);
     }
 
     @Bean

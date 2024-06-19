@@ -10,18 +10,18 @@ import lombok.RequiredArgsConstructor;
 import org.hibernate.internal.util.StringHelper;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.security.crypto.password.PasswordEncoder;
+import org.springframework.security.core.userdetails.ReactiveUserDetailsService;
+import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.stereotype.Service;
 import reactor.core.publisher.Mono;
 
 @Service
 @RequiredArgsConstructor
-public class UserService {
+public class UserService implements ReactiveUserDetailsService {
 
     private final Logger logger = LoggerFactory.getLogger(UserService.class);
 
     private final UserRepository userRepository;
-    private final PasswordEncoder passwordEncoder;
     private final RoleRepository roleRepository;
 
     public Mono<UserResponseDto> createUser(CreateUserDto userDto) {
@@ -31,7 +31,7 @@ public class UserService {
                 .flatMap(role -> {
                     User user = new User();
                     user.setUsername(userDto.username());
-                    user.setPassword(passwordEncoder.encode(userDto.password()));
+                    user.setPassword(userDto.password());
                     user.setRole(role);
                     return userRepository.save(user)
                             .doOnSuccess(u -> logger.info("User created: {}", u))
@@ -46,7 +46,19 @@ public class UserService {
                 });
     }
 
-    public Mono<UserResponseDto> findByUsername(String username) {
+    public Mono<UserDetails> findByUsername(String username) {
+        return userRepository.findByUsername(username).map(this::buildUserDetails);
+    }
+
+    private UserDetails buildUserDetails(User user) {
+        return org.springframework.security.core.userdetails.User.builder()
+                .username(user.getUsername())
+                .password(user.getPassword())
+                .roles(user.getRole().getName())
+                .build();
+    }
+
+    public Mono<UserResponseDto> findUserByUsername(String username) {
         return userRepository.findByUsername(username).flatMap(user -> Mono.just(new UserResponseDto(user.getId(),
                 user.getFirstname(),
                 user.getLastname(),
@@ -107,7 +119,7 @@ public class UserService {
         return userRepository.findById(id)
                 .switchIfEmpty(Mono.error(new IllegalArgumentException("User not found")))
                 .flatMap(user -> {
-                    user.setPassword(passwordEncoder.encode(password));
+                    user.setPassword(password);
                     return userRepository.save(user).flatMap(u -> Mono.just(new UserResponseDto(u.getId(),
                             u.getFirstname(),
                             u.getLastname(),
@@ -121,20 +133,18 @@ public class UserService {
     public Mono<UserResponseDto> updateRole(Long id, String role) {
         return userRepository.findById(id)
                 .switchIfEmpty(Mono.error(new IllegalArgumentException("User not found")))
-                .flatMap(user -> {
-                    return roleRepository.findByName(role)
-                            .switchIfEmpty(Mono.error(new IllegalArgumentException("Role not found")))
-                            .flatMap(r -> {
-                                user.setRole(r);
-                                return userRepository.save(user).flatMap(u -> Mono.just(new UserResponseDto(u.getId(),
-                                        u.getFirstname(),
-                                        u.getLastname(),
-                                        u.getEmail(),
-                                        u.getUsername(),
-                                        u.getPhone(),
-                                        u.getRole().getName())));
-                            });
-                });
+                .flatMap(user -> roleRepository.findByName(role)
+                        .switchIfEmpty(Mono.error(new IllegalArgumentException("Role not found")))
+                        .flatMap(r -> {
+                            user.setRole(r);
+                            return userRepository.save(user).flatMap(u -> Mono.just(new UserResponseDto(u.getId(),
+                                    u.getFirstname(),
+                                    u.getLastname(),
+                                    u.getEmail(),
+                                    u.getUsername(),
+                                    u.getPhone(),
+                                    u.getRole().getName())));
+                        }));
     }
 
 }

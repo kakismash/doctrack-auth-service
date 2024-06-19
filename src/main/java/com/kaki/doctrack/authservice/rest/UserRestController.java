@@ -3,6 +3,7 @@ package com.kaki.doctrack.authservice.rest;
 import com.kaki.doctrack.authservice.dto.user.CreateUserDto;
 import com.kaki.doctrack.authservice.dto.user.UpdateUserDto;
 import com.kaki.doctrack.authservice.dto.user.UserResponseDto;
+import com.kaki.doctrack.authservice.service.AuthService;
 import com.kaki.doctrack.authservice.service.UserService;
 import lombok.RequiredArgsConstructor;
 import org.slf4j.Logger;
@@ -19,9 +20,16 @@ public class UserRestController {
     private final Logger logger = LoggerFactory.getLogger(UserRestController.class);
 
     private final UserService userService;
+    private final AuthService authService;
 
     @PostMapping
     public Mono<ResponseEntity<UserResponseDto>> createUser(@RequestBody CreateUserDto userDto) {
+        if (userDto.password() == null || userDto.password().isEmpty()) {
+            return Mono.just(ResponseEntity.badRequest().body(null));
+        } else {
+            String tempPass = userDto.password();
+            userDto.withPassword(authService.encodePassword(tempPass));
+        }
         return userService.createUser(userDto).flatMap(user -> {
             logger.info("User created: {}", user);
             return Mono.just(ResponseEntity.ok(user));
@@ -29,7 +37,7 @@ public class UserRestController {
     }
 
     @GetMapping("/{id}")
-    public Mono<ResponseEntity<UserResponseDto>> findById(@PathVariable Long id) {
+    public Mono<ResponseEntity<UserResponseDto>> findById(@PathVariable("id") Long id) {
         return userService.findById(id)
                 .flatMap(user -> {
                     logger.info("User found: {}", user);
@@ -38,7 +46,7 @@ public class UserRestController {
     }
 
     @PutMapping("/{id}")
-    public Mono<ResponseEntity<UserResponseDto>> updateUser(@PathVariable Long id, @RequestBody UpdateUserDto userDto) {
+    public Mono<ResponseEntity<UserResponseDto>> updateUser(@PathVariable("id") Long id, @RequestBody UpdateUserDto userDto) {
         return userService.update(id, userDto)
                 .flatMap(user -> {
                     logger.info("User updated: {}", user);
@@ -47,7 +55,7 @@ public class UserRestController {
     }
 
     @DeleteMapping("/{id}")
-    public Mono<ResponseEntity<Void>> deleteUser(@PathVariable Long id) {
+    public Mono<ResponseEntity<Void>> deleteUser(@PathVariable("id") Long id) {
         return userService.deleteById(id)
                 .then(Mono.just(ResponseEntity.ok().<Void>build()))
                 .onErrorResume(e -> {
@@ -57,8 +65,8 @@ public class UserRestController {
     }
 
     @PutMapping("/{id}/password")
-    public Mono<ResponseEntity<Void>> updatePassword(@PathVariable Long id, @RequestBody String password) {
-        return userService.updatePassword(id, password)
+    public Mono<ResponseEntity<Void>> updatePassword(@PathVariable("id") Long id, @RequestBody String password) {
+        return userService.updatePassword(id, authService.encodePassword(password))
                 .then(Mono.just(ResponseEntity.ok().<Void>build()))
                 .onErrorResume(e -> {
                     logger.error("Error updating password for user with id {}: {}", id, e.getMessage());
@@ -67,7 +75,7 @@ public class UserRestController {
     }
 
     @PutMapping("/{id}/role")
-    public Mono<ResponseEntity<UserResponseDto>> updateRole(@PathVariable Long id, @RequestBody String role) {
+    public Mono<ResponseEntity<UserResponseDto>> updateRole(@PathVariable("id") Long id, @RequestBody String role) {
         return userService.updateRole(id, role)
                 .flatMap(u -> Mono.just(ResponseEntity.ok(u)))
                 .onErrorResume(e -> {
@@ -75,5 +83,4 @@ public class UserRestController {
                     return Mono.just(ResponseEntity.badRequest().build());
                 });
     }
-
 }

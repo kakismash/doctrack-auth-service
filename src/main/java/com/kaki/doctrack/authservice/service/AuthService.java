@@ -1,6 +1,7 @@
 package com.kaki.doctrack.authservice.service;
 
-import com.kaki.doctrack.authservice.dto.LoginRequestDto;
+import com.kaki.doctrack.authservice.dto.login.LoginRequestDto;
+import com.kaki.doctrack.authservice.dto.login.LoginResponseDto;
 import com.kaki.doctrack.authservice.entity.User;
 import com.kaki.doctrack.authservice.security.jwt.JwtUtil;
 import com.kaki.doctrack.authservice.repository.UserRepository;
@@ -24,22 +25,27 @@ public class AuthService {
 
     private final Logger logger = LoggerFactory.getLogger(AuthService.class);
 
-    public Mono<ResponseEntity<String>> login(LoginRequestDto loginRequestDto) {
+    public Mono<ResponseEntity<?>> login(LoginRequestDto loginRequestDto) {
         return findByUsername(loginRequestDto.username())
                 .doOnError(throwable -> logger.error("Error finding user by username: {}", loginRequestDto.username(), throwable))
                 .switchIfEmpty(Mono.error(new RuntimeException("User not found")))
                 .flatMap(user -> {
                     if (passwordEncoder.matches(loginRequestDto.password(), user.getPassword())) {
-                        String token = jwtUtil.generateToken(user.getUsername());
-                        return Mono.just(ResponseEntity.ok(token));
+                        String token = jwtUtil.generateToken(user);
+                        String refreshToken = jwtUtil.generateRefreshToken(user);
+                        return Mono.just(ResponseEntity.ok(new LoginResponseDto(token, refreshToken)));
                     } else {
-                        return Mono.just(ResponseEntity.badRequest().body("Invalid password"));
+                        return Mono.just(ResponseEntity.badRequest().body("Username or password is incorrect"));
                     }
                 });
     }
 
-    public Mono<ResponseEntity<String>> refreshToken(String token) {
-        return Mono.just(jwtUtil.refreshToken(token))
+    public Mono<ResponseEntity<?>> refreshToken(String token) {
+        if (!jwtUtil.validateJwtRefreshToken(token)) {
+            return Mono.just(ResponseEntity.badRequest().body("Invalid token"));
+        }
+        Long userId = jwtUtil.getUserIdFromToken(token);
+        return userRepository.findById(userId).flatMap(user -> Mono.just(jwtUtil.refreshToken(token, user)))
                 .map(ResponseEntity::ok);
     }
 
@@ -47,4 +53,11 @@ public class AuthService {
         return userRepository.findByUsername(username);
     }
 
+    public String encodePassword(String password) {
+        return passwordEncoder.encode(password);
+    }
+
+    public boolean validateJwtToken(String token) {
+        return jwtUtil.validateJwtToken(token);
+    }
 }
