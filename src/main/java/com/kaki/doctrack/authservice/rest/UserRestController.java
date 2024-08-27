@@ -46,12 +46,18 @@ public class UserRestController {
     }
 
     @PutMapping("/{id}")
-    public Mono<ResponseEntity<UserResponseDto>> updateUser(@PathVariable("id") Long id, @RequestBody UpdateUserDto userDto) {
-        return userService.update(id, userDto)
-                .flatMap(user -> {
-                    logger.info("User updated: {}", user);
-                    return Mono.just(ResponseEntity.ok(user));
-                }).onErrorResume(e -> Mono.just(ResponseEntity.badRequest().body(null)));
+    public Mono<ResponseEntity<UserResponseDto>> updateUser(@PathVariable("id") Long id, @RequestBody Mono<UpdateUserDto> updateUserDtoMono) {
+        return updateUserDtoMono.flatMap(updateUserDto ->
+                userService.update(id, updateUserDto)
+                        .flatMap(user -> {
+                            logger.info("User updated: {}", user);
+                            return Mono.just(ResponseEntity.ok(user));
+                        })
+                        .onErrorResume(e -> {
+                            logger.error("Error updating user", e);
+                            return Mono.just(ResponseEntity.badRequest().body(null));
+                        })
+        );
     }
 
     @DeleteMapping("/{id}")

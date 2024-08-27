@@ -7,7 +7,6 @@ import com.kaki.doctrack.authservice.entity.User;
 import com.kaki.doctrack.authservice.repository.RoleRepository;
 import com.kaki.doctrack.authservice.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
-import org.hibernate.internal.util.StringHelper;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.security.core.userdetails.ReactiveUserDetailsService;
@@ -86,23 +85,24 @@ public class UserService implements ReactiveUserDetailsService {
         return userRepository.findById(id)
                 .switchIfEmpty(Mono.error(new IllegalArgumentException("User not found")))
                 .flatMap(user -> {
-                    if (StringHelper.isNotEmpty(userDto.firstName())) {
-                        user.setFirstname(userDto.firstName());
-                    }
-                    if (StringHelper.isNotEmpty(userDto.lastName())) {
-                        user.setLastname(userDto.lastName());
+                    if (userDto.firstname().isPresent()) {
+                        user.setFirstname(userDto.firstname().get());
                     }
 
-                    if (StringHelper.isNotEmpty(userDto.phone())) {
-                        user.setPhone(userDto.phone());
+                    if (userDto.lastname().isPresent()) {
+                        user.setLastname(userDto.lastname().get());
                     }
 
-                    if (StringHelper.isNotEmpty(userDto.email())) {
-                        user.setEmail(userDto.email());
+                    if (userDto.phone().isPresent()) {
+                        user.setPhone(userDto.phone().get());
                     }
 
-                    if (StringHelper.isNotEmpty(userDto.username())) {
-                        user.setUsername(userDto.username());
+                    if (userDto.email().isPresent()) {
+                        user.setEmail(userDto.email().get());
+                    }
+
+                    if (userDto.username().isPresent()) {
+                        user.setUsername(userDto.username().get());
                     }
 
                     return userRepository.save(user).flatMap(u -> Mono.just(new UserResponseDto(u.getId(),

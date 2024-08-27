@@ -1,17 +1,21 @@
 package com.kaki.doctrack.authservice.security.filter;
 
+import com.kaki.doctrack.authservice.exception.JWTException;
 import com.kaki.doctrack.authservice.security.jwt.JwtUtil;
 import com.kaki.doctrack.authservice.service.UserService;
+import io.jsonwebtoken.JwtException;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.http.HttpHeaders;
+import org.springframework.http.HttpStatus;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.context.ReactiveSecurityContextHolder;
 import org.springframework.security.core.context.SecurityContext;
 import org.springframework.security.core.context.SecurityContextImpl;
 import org.springframework.security.core.userdetails.UserDetails;
+import org.springframework.security.core.userdetails.UsernameNotFoundException;
 import org.springframework.stereotype.Component;
 import org.springframework.util.StringUtils;
 import org.springframework.web.server.ServerWebExchange;
@@ -46,7 +50,30 @@ public class ReactiveAuthTokenFilter implements WebFilter {
                             });
                 })
                 .switchIfEmpty(chain.filter(exchange))
-                .doOnError(e -> logger.error("Cannot set user authentication: {}", e));
+                .onErrorResume(e -> {
+                    logger.error("Cannot set user authentication");
+                    return handleAuthenticationError(exchange, e);
+                });
+    }
+
+    private Mono<Void> handleAuthenticationError(ServerWebExchange exchange, Throwable e) {
+        HttpStatus status;
+        String errorMessage;
+
+        if (e instanceof JwtException || e instanceof JWTException) {  // Adjust this based on your JWT exception type
+            status = HttpStatus.UNAUTHORIZED;
+            errorMessage = "Invalid or expired JWT token";
+        } else if (e instanceof UsernameNotFoundException) { // Adjust based on your service exception type
+            status = HttpStatus.FORBIDDEN;
+            errorMessage = "User not found";
+        } else {
+            status = HttpStatus.INTERNAL_SERVER_ERROR;
+            errorMessage = "Internal server error";
+        }
+
+        exchange.getResponse().setStatusCode(status);
+        return exchange.getResponse()
+                .writeWith(Mono.just(exchange.getResponse().bufferFactory().wrap(errorMessage.getBytes())));
     }
 
     private UsernamePasswordAuthenticationToken createAuthenticationToken(UserDetails user) {

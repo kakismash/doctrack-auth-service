@@ -2,6 +2,7 @@ package com.kaki.doctrack.authservice.security.jwt;
 
 import com.kaki.doctrack.authservice.dto.login.LoginResponseDto;
 import com.kaki.doctrack.authservice.entity.User;
+import com.kaki.doctrack.authservice.exception.JWTException;
 import io.jsonwebtoken.*;
 import io.jsonwebtoken.io.Decoders;
 import io.jsonwebtoken.security.Keys;
@@ -47,10 +48,19 @@ public class JwtUtil {
     }
 
     private Claims extractAllClaims(String token) {
-        return Jwts.parser()
-                .verifyWith(getSigningKey())
-                .build()
-                .parseSignedClaims(token).getPayload();
+        try {
+            Claims claims =  Jwts.parser()
+                    .verifyWith(getSigningKey())
+                    .build()
+                    .parseSignedClaims(token)
+                    .getPayload();
+            logger.info("Extracted claims: {}", claims);
+            return claims;
+        } catch (Exception e) {
+            logger.error("Failed to parse JWT token: {}", token, e);
+            throw new JWTException("Invalid JWT token", "JWT_INVALID");
+        }
+
     }
 
     public boolean validateJwtToken(String authToken) {
@@ -62,22 +72,26 @@ public class JwtUtil {
             return true;
         } catch (SignatureException e) {
             logger.error("Invalid JWT signature: {}", e.getMessage());
+            throw new JWTException("INVALID_SIGNATURE", "Invalid JWT signature");
         } catch (MalformedJwtException e) {
             logger.error("Invalid JWT token: {}", e.getMessage());
+            throw new JWTException("INVALID_TOKEN", "Invalid JWT token");
         } catch (ExpiredJwtException e) {
             logger.error("JWT token is expired: {}", e.getMessage());
+            throw new JWTException("INVALID_TOKEN", "JWT token is expired");
         } catch (UnsupportedJwtException e) {
             logger.error("JWT token is unsupported: {}", e.getMessage());
+            throw new JWTException("INVALID_TOKEN", "JWT token is unsupported");
         } catch (IllegalArgumentException e) {
             logger.error("JWT claims string is empty: {}", e.getMessage());
+            throw new JWTException("INVALID_TOKEN", "JWT claims string is empty");
         }
-
-        return false;
     }
 
     private String createToken(User user) {
         Map<String, Object> claims = new HashMap<>();
         claims.put("role", user.getRole().getName());
+        claims.put("id", user.getId());
 
         return Jwts.builder()
                 .subject(user.getUsername())

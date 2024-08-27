@@ -37,12 +37,14 @@ public class AuthRestController {
     }
 
     @GetMapping("/validate")
-    public ResponseEntity<Void> validateToken(@RequestParam("token") String token) {
-        if (authService.validateJwtToken(token)) {
-            return ResponseEntity.ok().build();
-        } else {
-            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();
-        }
+    public Mono<ResponseEntity<Void>> validateToken(@RequestParam("token") String token) {
+        return Mono.fromCallable(() -> {
+            if (authService.validateJwtToken(token)) {
+                return ResponseEntity.ok().build();
+            } else {
+                return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();
+            }
+        });
     }
 
 }

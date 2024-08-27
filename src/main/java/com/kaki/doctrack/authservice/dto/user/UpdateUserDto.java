@@ -1,8 +1,10 @@
 package com.kaki.doctrack.authservice.dto.user;
 
-public record UpdateUserDto(String username,
-                             String email,
-                             String firstName,
-                             String lastName,
-                             String phone) {
+import java.util.Optional;
+
+public record UpdateUserDto(Optional<String> username,
+                            Optional<String> email,
+                            Optional<String> firstname,
+                            Optional<String> lastname,
+                            Optional<String> phone) {
 }
