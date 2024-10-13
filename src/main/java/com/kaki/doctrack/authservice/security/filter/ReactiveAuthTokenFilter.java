@@ -23,7 +23,6 @@ import org.springframework.web.server.WebFilter;
 import org.springframework.web.server.WebFilterChain;
 import reactor.core.publisher.Mono;
 
-@Component
 @Slf4j
 @RequiredArgsConstructor
 public class ReactiveAuthTokenFilter implements WebFilter {
@@ -44,6 +43,7 @@ public class ReactiveAuthTokenFilter implements WebFilter {
                             .map(this::createAuthenticationToken)
                             .flatMap(authentication -> {
                                 SecurityContext context = new SecurityContextImpl(authentication);
+                                logger.info("User authenticated: {}", username);
                                 return Mono.just(context)
                                         .flatMap(ctx -> chain.filter(exchange)
                                                 .contextWrite(ReactiveSecurityContextHolder.withSecurityContext(Mono.just(ctx))));

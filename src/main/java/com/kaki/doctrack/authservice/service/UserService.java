@@ -6,13 +6,22 @@ import com.kaki.doctrack.authservice.dto.user.UserResponseDto;
 import com.kaki.doctrack.authservice.entity.User;
 import com.kaki.doctrack.authservice.repository.RoleRepository;
 import com.kaki.doctrack.authservice.repository.UserRepository;
+import com.kaki.doctrack.authservice.security.jwt.JwtUtil;
 import lombok.RequiredArgsConstructor;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageImpl;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.security.core.Authentication;
 import org.springframework.security.core.userdetails.ReactiveUserDetailsService;
 import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.stereotype.Service;
 import reactor.core.publisher.Mono;
+
+import java.util.List;
+import java.util.Optional;
+import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
@@ -22,6 +31,7 @@ public class UserService implements ReactiveUserDetailsService {
 
     private final UserRepository userRepository;
     private final RoleRepository roleRepository;
+    private final JwtUtil jwtUtil;
 
     public Mono<UserResponseDto> createUser(CreateUserDto userDto) {
 
@@ -147,4 +157,20 @@ public class UserService implements ReactiveUserDetailsService {
                         }));
     }
 
+    public Mono<Page<UserResponseDto>> findUsersBySearchTerm(String searchTerm, PageRequest pageRequest) {
+        int limit = pageRequest.getPageSize() + 1;  // Fetch one extra record to check for more pages
+        int offset = (int) pageRequest.getOffset();
+
+        return userRepository.findAllBySearchTermWithLimit(searchTerm, limit, offset)
+                .collectList()
+                .map(users -> {
+                    boolean hasNext = users.size() > pageRequest.getPageSize();  // Check if there's an extra record
+                    List<UserResponseDto> paginatedUsers = users.stream()
+                            .limit(pageRequest.getPageSize())  // Limit the list to the page size
+                            .map(UserResponseDto::fromEntity)  // Convert User to UserResponseDto
+                            .collect(Collectors.toList());
+
+                    return new PageImpl<>(paginatedUsers, pageRequest, hasNext ? pageRequest.getOffset() + pageRequest.getPageSize() + 1 : pageRequest.getOffset());
+                });
+    }
 }

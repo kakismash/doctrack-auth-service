@@ -1,6 +1,7 @@
 package com.kaki.doctrack.authservice.rest;
 
 import com.kaki.doctrack.authservice.dto.RefreshTokenRequestDto;
+import com.kaki.doctrack.authservice.dto.UserInfoDTO;
 import com.kaki.doctrack.authservice.dto.login.LoginRequestDto;
 import com.kaki.doctrack.authservice.service.AuthService;
 import lombok.RequiredArgsConstructor;
@@ -37,10 +38,11 @@ public class AuthRestController {
     }
 
     @GetMapping("/validate")
-    public Mono<ResponseEntity<Void>> validateToken(@RequestParam("token") String token) {
+    public Mono<ResponseEntity<UserInfoDTO>> validateToken(@RequestParam("token") String token) {
         return Mono.fromCallable(() -> {
             if (authService.validateJwtToken(token)) {
-                return ResponseEntity.ok().build();
+                UserInfoDTO userInfo = authService.getUserInfoFromJwtToken(token);
+                return ResponseEntity.ok(userInfo);
             } else {
                 return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();
             }

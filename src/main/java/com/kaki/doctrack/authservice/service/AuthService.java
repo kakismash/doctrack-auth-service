@@ -1,5 +1,6 @@
 package com.kaki.doctrack.authservice.service;
 
+import com.kaki.doctrack.authservice.dto.UserInfoDTO;
 import com.kaki.doctrack.authservice.dto.login.LoginRequestDto;
 import com.kaki.doctrack.authservice.dto.login.LoginResponseDto;
 import com.kaki.doctrack.authservice.entity.User;
@@ -59,5 +60,9 @@ public class AuthService {
 
     public boolean validateJwtToken(String token) {
         return jwtUtil.validateJwtToken(token);
+    }
+
+    public UserInfoDTO getUserInfoFromJwtToken(String token) {
+        return jwtUtil.getUserInfoFromJwtToken(token);
     }
 }

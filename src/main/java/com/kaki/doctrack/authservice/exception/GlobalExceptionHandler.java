@@ -26,7 +26,7 @@ public class GlobalExceptionHandler {
     @ExceptionHandler(Exception.class)
     public Mono<ResponseEntity<ErrorResponse>> handleAllExceptions(Exception ex) {
         logger.error("Handling unexpected exception: ", ex);
-        ErrorResponse errorResponse = new ErrorResponse("INTERNAL_SERVER_ERROR", "An unexpected error occurred.");
+        ErrorResponse errorResponse = new ErrorResponse("INTERNAL_SERVER_ERROR", ex.getMessage());
         return Mono.just(ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
                 .contentType(MediaType.APPLICATION_JSON)
                 .body(errorResponse));
