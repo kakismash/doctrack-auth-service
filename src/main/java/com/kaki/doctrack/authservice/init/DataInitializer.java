@@ -25,8 +25,9 @@ public class DataInitializer {
     }
 
     private Mono<Void> initRoles() {
-        return createRoleIfNotExists(ERole.SUPERADMIN)
+        return createRoleIfNotExists(ERole.SUPER_ADMIN)
                 .then(createRoleIfNotExists(ERole.ADMIN))
+                .then(createRoleIfNotExists(ERole.ORGANIZATION_ADMIN))
                 .then(createRoleIfNotExists(ERole.USER_READ_ONLY))
                 .then(createRoleIfNotExists(ERole.USER_READ_WRITE))
                 .then();
@@ -39,7 +40,7 @@ public class DataInitializer {
     }
 
     private Mono<Void> initSuperAdminUser() {
-        return roleRepository.findByName(ERole.SUPERADMIN.name())
+        return roleRepository.findByName(ERole.SUPER_ADMIN.name())
                 .flatMap(role -> userRepository.findByUsername("kaki1991")
                         .switchIfEmpty(Mono.defer(() -> {
                             User user = new User();

@@ -1,6 +1,5 @@
 package com.kaki.doctrack.authservice.security;
 
-import com.kaki.doctrack.authservice.security.filter.ReactiveAuthTokenFilter;
 import com.kaki.doctrack.authservice.security.jwt.JwtUtil;
 import com.kaki.doctrack.authservice.service.UserService;
 import io.jsonwebtoken.io.Decoders;
@@ -13,7 +12,6 @@ import org.springframework.security.authentication.ReactiveAuthenticationManager
 import org.springframework.security.authentication.UserDetailsRepositoryReactiveAuthenticationManager;
 import org.springframework.security.config.annotation.method.configuration.EnableReactiveMethodSecurity;
 import org.springframework.security.config.annotation.web.reactive.EnableWebFluxSecurity;
-import org.springframework.security.config.web.server.SecurityWebFiltersOrder;
 import org.springframework.security.config.web.server.ServerHttpSecurity;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.security.crypto.password.PasswordEncoder;
@@ -27,15 +25,12 @@ import org.springframework.security.web.server.SecurityWebFilterChain;
 import reactor.core.publisher.Mono;
 
 import javax.crypto.spec.SecretKeySpec;
-import java.nio.charset.StandardCharsets;
 
 @Configuration
 @EnableWebFluxSecurity
 @EnableReactiveMethodSecurity
 @RequiredArgsConstructor
 public class SecurityConfig {
-
-    private final JwtUtil jwtUtil;
 
     private final UserService userService;
 
@@ -47,6 +42,7 @@ public class SecurityConfig {
         http
                 .csrf(ServerHttpSecurity.CsrfSpec::disable)  // Disable CSRF protection for API requests
                 .authorizeExchange(exchanges -> exchanges
+                        .pathMatchers("/api/v1/internal-api-key/**").permitAll()  // Allow all requests to internal API key endpoints
                         .pathMatchers("/api/v1/auth/**").permitAll()  // Allow all requests to authentication endpoints
                         .pathMatchers("/api/v1/documents/public/**").permitAll()  // Allow public document access
                         .pathMatchers("/api/v1/documents/users/**").hasAnyRole("USER", "ADMIN")  // Require USER or ADMIN role for user documents
@@ -54,7 +50,7 @@ public class SecurityConfig {
                         .anyExchange().authenticated()  // Require authentication for all other requests
                 )
                 .exceptionHandling(exceptionHandlingSpec -> exceptionHandlingSpec
-                        .authenticationEntryPoint((exchange, e) -> Mono.fromRunnable(() ->
+                        .authenticationEntryPoint((exchange, _e) -> Mono.fromRunnable(() ->
                                 exchange.getResponse().setStatusCode(HttpStatus.UNAUTHORIZED))))  // Return 401 for unauthenticated requests
                 .oauth2ResourceServer(oauth2 -> oauth2
                         .jwt(jwtSpec -> jwtSpec.jwtAuthenticationConverter(jwtAuthenticationConverter()))  // Set up JWT validation
