@@ -1,11 +1,15 @@
 package com.kaki.doctrack.authservice.rest;
 
 import com.kaki.doctrack.authservice.dto.user.CreateUserDto;
+import com.kaki.doctrack.authservice.dto.user.InviteUserDto;
 import com.kaki.doctrack.authservice.dto.user.UpdateUserDto;
 import com.kaki.doctrack.authservice.dto.user.UserResponseDto;
+import com.kaki.doctrack.authservice.entity.ERole;
+import com.kaki.doctrack.authservice.entity.Role;
 import com.kaki.doctrack.authservice.security.jwt.JwtUtil;
 import com.kaki.doctrack.authservice.service.AuthService;
 import com.kaki.doctrack.authservice.service.UserService;
+import com.kaki.doctrack.authservice.service.client.OrganizationClient;
 import io.jsonwebtoken.Claims;
 import io.jsonwebtoken.Jwts;
 import lombok.RequiredArgsConstructor;
@@ -14,6 +18,7 @@ import org.slf4j.LoggerFactory;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.http.HttpHeaders;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.GrantedAuthority;
@@ -34,17 +39,23 @@ public class UserRestController {
     private final UserService userService;
     private final AuthService authService;
     private final JwtUtil jwtUtil;
+    private final OrganizationClient organizationClient;
 
     @GetMapping("/roles")
-    public Mono<String> getCurrentUserRoles(Authentication authentication) {
-        return Mono.just("Roles: " + authentication.getAuthorities().toString());  // Get user roles
+    public Mono<String> getCurrentUserRoles(
+            @RequestHeader("X-User-Id") Long userId,
+            @RequestHeader("X-User-Name") String username,
+            @RequestHeader("X-User-Role") String role
+                                            ) {
+        return Mono.just("Roles: ".concat(role));  // Get user roles
     }
 
     @GetMapping
     public Mono<ResponseEntity<Page<UserResponseDto>>> getUsers(
-            ServerWebExchange exchange,
-            Authentication authentication,
-            @RequestParam(value = "buildingId", required = false) Long buildingId,
+            @RequestHeader("X-User-Id") Long userId,
+            @RequestHeader("X-User-Name") String username,
+            @RequestHeader("X-User-Role") String role,
+            @RequestParam(value = "organizationId", required = false) Long organizationId,
             @RequestParam(value = "page", defaultValue = "0") int page,  // Default page = 0
             @RequestParam(value = "size", defaultValue = "10") int size,  // Default size = 10
             @RequestParam(value = "search", required = false, defaultValue = "") String searchTerm) {
@@ -53,39 +64,70 @@ public class UserRestController {
 
         // Extract user roles
         // Extract user roles
-        Collection<? extends GrantedAuthority> authorities = authentication.getAuthorities();
-        boolean isSuperAdmin = authorities.stream().anyMatch(role -> role.getAuthority().equals("ROLE_SUPERADMIN"));
-        boolean isAdmin = authorities.stream().anyMatch(role -> role.getAuthority().equals("ROLE_ADMIN"));
+        boolean isSuperAdmin = ERole.SUPER_ADMIN.name().equals(role);
+        boolean isAdmin = ERole.ADMIN.name().equals(role);
 
         Long finalBuildingId;
         // If the user is not an admin, use the buildingId from the JWT token
         if (!isAdmin && !isSuperAdmin) {
             // Assume the buildingId is stored as a claim in the JWT
-            String token = extractTokenFromRequest(exchange);
-            if (token != null) {
-                // Extract buildingId from the token
-                finalBuildingId = extractBuildingIdFromToken(token);
-            } else {
+//            String token = extractTokenFromRequest(exchange);
+//            if (token != null) {
+//                // Extract buildingId from the token
+//                finalBuildingId = extractBuildingIdFromToken(token);
+//            } else {
                 return Mono.just(ResponseEntity.badRequest().build());
-            }
+//            }
         } else {
-            if (buildingId == null) {
+            if (organizationId == null) {
                 return userService.findUsersBySearchTerm(searchTerm, pageRequest)
                         .map(ResponseEntity::ok)
                         .defaultIfEmpty(ResponseEntity.notFound().build());
             } else {
-                return null;
+                return userService.findUsersByOrganizationId(organizationId, searchTerm, pageRequest)
+                        .map(ResponseEntity::ok)
+                        .defaultIfEmpty(ResponseEntity.notFound().build());
             }
         }
-
-        return null;
-
     }
 
+    @PostMapping("/invite/organization")
+    public Mono<ResponseEntity<Void>> inviteUser(
+            @RequestHeader("X-User-Id") Long userId,
+            @RequestHeader("X-User-Name") String username,
+            @RequestHeader("X-User-Role") String role,
+            @RequestBody InviteUserDto inviteUserDto
+    ) {
+        // Check if the user has the necessary permissions
+        if (ERole.checkHierarchy(ERole.valueOf(role), ERole.ORGANIZATION_ADMIN)) {
+            return Mono.defer(() -> {
+                Long organizationId = inviteUserDto.organizationId();
 
+                // Check if organizationId is null
+                if (organizationId == null) {
+                    return userService.inviteUser(inviteUserDto, "")
+                            .doOnSuccess(user -> logger.info("User invited successfully: {}", user))
+                            .doOnError(e -> logger.error("Error inviting user", e))
+                            .then(Mono.just(ResponseEntity.ok().build())); // Ensure proper chaining
+                } else {
+                    return organizationClient.getOrganizationById(organizationId)
+                            .flatMap(org -> userService.inviteUser(inviteUserDto, org.name())
+                                    .doOnSuccess(user -> logger.info("User invited successfully: {}", user))
+                                    .doOnError(e -> logger.error("Error inviting user", e)))
+                            .then(Mono.just(ResponseEntity.ok().build())); // Ensure proper chaining
+                }
+            });
+        } else {
+            // Respond with 403 Forbidden if the user lacks permissions
+            return Mono.just(ResponseEntity.status(HttpStatus.FORBIDDEN).build());
+        }
+    }
 
     @PostMapping
-    public Mono<ResponseEntity<UserResponseDto>> createUser(@RequestBody CreateUserDto userDto) {
+    public Mono<ResponseEntity<UserResponseDto>> createUser(
+            @RequestHeader("X-Invitation") String invitation,
+            @RequestBody CreateUserDto userDto
+    ) {
         if (userDto.password() == null || userDto.password().isEmpty()) {
             return Mono.just(ResponseEntity.badRequest().body(null));
         } else {

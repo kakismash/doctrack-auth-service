@@ -65,4 +65,12 @@ public class AuthService {
     public UserInfoDTO getUserInfoFromJwtToken(String token) {
         return jwtUtil.getUserInfoFromJwtToken(token);
     }
+
+    public Mono<Boolean> validateInvitationToken(String invitationToken) {
+        return jwtUtil.validateInvitationToken(invitationToken);
+    }
+
+    public Mono<UserInfoDTO> getUserInfoFromInvitationToken(String invitationToken) {
+        return jwtUtil.getUserInfoFromInvitationToken(invitationToken);
+    }
 }

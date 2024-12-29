@@ -2,8 +2,10 @@ package com.kaki.doctrack.authservice.security.jwt;
 
 import com.kaki.doctrack.authservice.dto.UserInfoDTO;
 import com.kaki.doctrack.authservice.dto.login.LoginResponseDto;
+import com.kaki.doctrack.authservice.entity.EUserStatus;
 import com.kaki.doctrack.authservice.entity.User;
 import com.kaki.doctrack.authservice.exception.JWTException;
+import com.kaki.doctrack.authservice.repository.UserRepository;
 import io.jsonwebtoken.*;
 import io.jsonwebtoken.io.Decoders;
 import io.jsonwebtoken.security.Keys;
@@ -16,6 +18,7 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Component;
+import reactor.core.publisher.Mono;
 
 import javax.crypto.SecretKey;
 import java.util.Date;
@@ -29,12 +32,16 @@ import java.util.function.Function;
 public class JwtUtil {
 
     private final Logger logger = LoggerFactory.getLogger(JwtUtil.class);
+    private final UserRepository userRepository;
 
     @Value("${doctrack.app.jwtSecret}")
     private String jwtSecret;
 
     @Value("${doctrack.app.jwtExpirationMs}")
     private int jwtExpirationMs;
+
+    @Value("${doctrack.app.invitationSecretKey}")
+    private String secretKey;
 
     public SecretKey getSigningKey() {
         byte[] keyBytes = Decoders.BASE64.decode(jwtSecret);
@@ -157,5 +164,60 @@ public class JwtUtil {
     public UserInfoDTO getUserInfoFromJwtToken(String token) {
         Claims claims = extractAllClaims(token);
         return new UserInfoDTO(getUserNameFromJwtToken(token), claims.get("id", Long.class), claims.get("role", String.class));
+    }
+
+    public Mono<Boolean> validateInvitationToken(String invitationToken) {
+        try {
+            Claims claims = Jwts.parser()
+                    .setSigningKey(secretKey)
+                    .parseClaimsJws(invitationToken)
+                    .getBody();
+
+            String subject = claims.getSubject();
+
+            if (subject.equals("activation-link")
+                    && claims.getExpiration() != null
+                    && claims.getExpiration().after(new Date())
+                    && claims.get("email") != null) {
+
+                String email = claims.get("email", String.class);
+                logger.info("Validating invitation token for email: {}", email);
+
+                // Check if the user exists
+                return userRepository.findByUsername(email)
+                        .map(user -> {
+                            logger.info("User found for email: {}", email);
+                            if (user.getStatus() == EUserStatus.INVITED.ordinal()) { // Correct enum comparison
+                                logger.info("User is pending activation.");
+                                return true;
+                            } else {
+                                logger.warn("User is not pending activation.");
+                                return false;
+                            }
+                        })
+                        .defaultIfEmpty(true) // No user found, token is valid
+                        .onErrorResume(e -> {
+                            logger.error("Error during user lookup: {}", e.getMessage());
+                            return Mono.just(false);
+                        });
+            } else {
+                logger.warn("Invalid token structure or expired.");
+                return Mono.just(false);
+            }
+        } catch (SignatureException | MalformedJwtException | ExpiredJwtException |
+                 UnsupportedJwtException | IllegalArgumentException e) {
+            logger.error("Token validation failed: {}", e.getMessage());
+            return Mono.just(false);
+        }
+    }
+
+
+    public Mono<UserInfoDTO> getUserInfoFromInvitationToken(String invitationToken) {
+        Claims claims = Jwts.parser()
+                .setSigningKey(secretKey)
+                .parseClaimsJws(invitationToken)
+                .getBody();
+
+        return Mono.just(new UserInfoDTO(claims.get("email", String.class), claims.get("id", Long.class), claims.get("role", String.class)));
     }
 }

@@ -49,4 +49,18 @@ public class AuthRestController {
         });
     }
 
+    @GetMapping("/validate-invitation-token")
+    public Mono<ResponseEntity<UserInfoDTO>> validateInvitationToken(@RequestParam("token") String invitationToken) {
+        return authService.validateInvitationToken(invitationToken)
+                .flatMap(isValid -> {
+                    if (isValid) {
+                        return authService.getUserInfoFromInvitationToken(invitationToken)
+                                .map(ResponseEntity::ok);
+                    } else {
+                        return Mono.just(ResponseEntity.status(HttpStatus.UNAUTHORIZED).build());
+                    }
+                });
+    }
+
+
 }

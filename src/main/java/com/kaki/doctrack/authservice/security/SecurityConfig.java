@@ -1,12 +1,12 @@
 package com.kaki.doctrack.authservice.security;
 
-import com.kaki.doctrack.authservice.security.jwt.JwtUtil;
 import com.kaki.doctrack.authservice.service.UserService;
 import io.jsonwebtoken.io.Decoders;
 import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.context.annotation.Lazy;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.authentication.ReactiveAuthenticationManager;
 import org.springframework.security.authentication.UserDetailsRepositoryReactiveAuthenticationManager;
@@ -32,7 +32,7 @@ import javax.crypto.spec.SecretKeySpec;
 @RequiredArgsConstructor
 public class SecurityConfig {
 
-    private final UserService userService;
+    private final @Lazy UserService userService;
 
     @Value("${doctrack.app.jwtSecret}")
     private String jwtSecret;
@@ -44,6 +44,7 @@ public class SecurityConfig {
                 .authorizeExchange(exchanges -> exchanges
                         .pathMatchers("/api/v1/internal-api-key/**").permitAll()  // Allow all requests to internal API key endpoints
                         .pathMatchers("/api/v1/auth/**").permitAll()  // Allow all requests to authentication endpoints
+                        .pathMatchers("/api/v1/users/**").permitAll()  // Allow all requests to user endpoints
                         .pathMatchers("/api/v1/documents/public/**").permitAll()  // Allow public document access
                         .pathMatchers("/api/v1/documents/users/**").hasAnyRole("USER", "ADMIN")  // Require USER or ADMIN role for user documents
                         .pathMatchers("/api/v1/documents/admins/**").hasRole("ADMIN")  // Restrict access to admin documents to ADMIN role

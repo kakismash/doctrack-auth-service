@@ -56,6 +56,12 @@ public class User implements UserDetails {
     @Column(nullable = false)
     private boolean enabled = true;
 
+    @Column(nullable = true)
+    private Long organizationId;
+
+    @Column(nullable = false)
+    private int status;
+
     @ToString.Exclude
     @ManyToOne(cascade = {CascadeType.REFRESH, CascadeType.DETACH})
     @JoinColumn(name = "role_id")
